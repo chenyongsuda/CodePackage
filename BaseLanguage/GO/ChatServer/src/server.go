@@ -38,7 +38,7 @@ func server(listen *net.TCPListener) {
 			continue
 		}
 		fmt.Println("Connect Accepted~")
-		user_conn := NewUserConnect(conn)
+		user_conn := NewUserConnectExt(conn)
 		go user_conn.LoopMessage()
 		go TestMap()
 	}
@@ -53,28 +53,70 @@ func TestMap() {
 
 //-------------------------------------------------------------UserConnect-------------------------------------------------------------
 //init con map data
-var ConnectMap = make(map[net.Conn]int)
+var ConnectMap = make(map[net.Conn]*UserConnect)
 
-func GetConnectMap() map[net.Conn]int {
+// store the User When The User Send Login Message to Server
+var userConnectMap = make(map[int]*UserConnect)
+
+func GetUserConnectMap() map[int]*UserConnect {
+	return userConnectMap
+}
+
+func AddUserConnect(uid int, con *UserConnect) {
+	_, ok := userConnectMap[uid]
+	if ok == true {
+		RemoveUserConnect(uid)
+	}
+	userConnectMap[uid] = con
+}
+
+func RemoveUserConnect(uid int) {
+	_, ok := userConnectMap[uid]
+	if ok == true {
+		delete(userConnectMap, uid)
+	}
+}
+
+func GetConnectMap() map[net.Conn]*UserConnect {
 	return ConnectMap
 }
 
-func AddConnect(conn net.Conn) {
-	ConnectMap[conn] = 1
+func AddConnect(conn net.Conn, val *UserConnect) {
+	ConnectMap[conn] = val
 }
 
 func RemoveConnect(conn net.Conn) {
-	delete(ConnectMap, conn)
+	value, ok := ConnectMap[conn]
+	if ok == true {
+		delete(ConnectMap, conn)
+		value.Disconnect()
+	}
 }
 
 func NewUserConnect(conn net.Conn) *UserConnect {
-	AddConnect(conn)
 	return &UserConnect{conn: conn}
+}
+
+func NewUserConnectExt(conn net.Conn) *UserConnect {
+	uc := NewUserConnect(conn)
+	AddConnect(conn, uc)
+	return uc
 }
 
 type UserConnect struct {
 	disconnct bool
 	conn      net.Conn
+}
+
+func (uc *UserConnect) Disconnect() {
+	uc.WriteMessage("YOU Have DisConnected From Server")
+	uc.disconnct = true
+}
+
+func (uc *UserConnect) WriteMessage(messge string) {
+	if false == uc.disconnct {
+		uc.conn.Write([]byte(messge))
+	}
 }
 
 func (uc *UserConnect) LoopMessage() {
@@ -111,20 +153,22 @@ func (uc *UserConnect) LoopMessage() {
 
 func (uc *UserConnect) handMessage(msg_buff *bytes.Buffer, len *int) {
 	msg_head_msg_len := uint32(0)
+	msg_head_msg_type := uint32(0)
 	for {
 		//Read Header
-		if *len == 0 && msg_buff.Len() >= 4 {
+		if *len == 0 && msg_buff.Len() >= 8 {
 			msg_head_msg_len = binary.LittleEndian.Uint32(msg_buff.Next(4))
 			if msg_head_msg_len > 10240 {
 				fmt.Println("too long message")
 			}
+			msg_head_msg_type = binary.LittleEndian.Uint32(msg_buff.Next(4))
 			*len = int(msg_head_msg_len)
 		}
 
 		//Read Body
 		if *len != 0 && msg_buff.Len() >= *len {
 			msg_content := msg_buff.Next(*len)
-			fmt.Println("Msg content is " + string(msg_content))
+			fmt.Println("Type:", msg_head_msg_type, "	Msg: ", string(msg_content))
 			*len = 0
 		} else {
 			break
