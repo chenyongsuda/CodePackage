@@ -28,12 +28,14 @@ func main() {
 func Client(conn net.Conn) {
 
 	message := []byte("我是UTF-8")
-	tlen := 4 + len(message)
+	cmd_type := uint32(1)
+	tlen := 4 + 4 + len(message)
 	send_buff := bytes.NewBuffer(make([]byte, 0, 1024))
 
 	for {
 		for i := 0; i < 10; i++ {
 			binary.Write(send_buff, binary.LittleEndian, uint32(len(message)))
+			binary.Write(send_buff, binary.LittleEndian, cmd_type)
 			send_buff.Write(message)
 		}
 
