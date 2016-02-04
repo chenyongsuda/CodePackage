@@ -1,13 +1,20 @@
 package main
 
 import (
-	//"bufio"
+	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
-	//"os"
-	"time"
+	"os"
+)
+
+const (
+	CMD_LOGIN   = 100000
+	CMD_EXIT    = 100001
+	CMD_MSG_P2P = 100002
 )
 
 const (
@@ -21,54 +28,75 @@ func main() {
 		return
 	}
 	fmt.Println("已经连接服务器")
+	defer conn.Close()
+	go LoopReceive(conn)
 	Client(conn)
-	conn.Close()
+
 }
 
 func Client(conn net.Conn) {
-
-	message := []byte("我是UTF-8")
-	cmd_type := uint32(1)
-	tlen := 4 + 4 + len(message)
-	send_buff := bytes.NewBuffer(make([]byte, 0, 1024))
-
+	read := bufio.NewReader(os.Stdin)
 	for {
-		for i := 0; i < 10; i++ {
-			binary.Write(send_buff, binary.LittleEndian, uint32(len(message)))
-			binary.Write(send_buff, binary.LittleEndian, cmd_type)
-			send_buff.Write(message)
+		data, _, _ := read.ReadLine()
+		command := string(data)
+		if command == "c" {
+			Login(conn, "1000", "TOM")
+		} else {
+			Talk(conn, "1000", "TOM", "1001", string(data))
 		}
-
-		fmt.Println("发送一整条信息：")
-		conn.Write(send_buff.Next(tlen))
-		time.Sleep(time.Second)
-
-		//发送不完整head信息
-		fmt.Println("发送不完整head信息：")
-		conn.Write(send_buff.Next(2))
-		time.Sleep(time.Second)
-		conn.Write(send_buff.Next(tlen - 2))
-		time.Sleep(time.Second)
-
-		fmt.Println("发送3条信息：")
-		time.Sleep(time.Second)
-		conn.Write(send_buff.Next(3 * tlen))
-
-		fmt.Println("发送不全的消息体：")
-		time.Sleep(time.Second)
-		conn.Write(send_buff.Next(6))
-		time.Sleep(time.Second)
-		conn.Write(send_buff.Next(tlen - 6))
-
-		fmt.Println("多段发送：")
-		conn.Write(send_buff.Next(tlen + 2))
-		time.Sleep(time.Second)
-		conn.Write(send_buff.Next(-2 + tlen - 8))
-		time.Sleep(time.Second)
-		conn.Write(send_buff.Next(8 + 1))
-		time.Sleep(time.Second)
-		conn.Write(send_buff.Next(-1 + tlen + tlen))
-
 	}
+}
 
+func LoopReceive(conn net.Conn) {
+	read_buff := make([]byte, 4096)
+	for {
+		c, err := conn.Read(read_buff)
+		//message, err := reader.ReadString('\n')
+		if err == io.EOF {
+			fmt.Println("Client Exit", err.Error())
+			break
+		}
+		if err != nil {
+			fmt.Println("Data read Error", err.Error())
+			break
+		}
+		fmt.Println("LoopReceive	", c)
+		fmt.Println(string(read_buff[:c]))
+	}
+}
+
+func Login(conn net.Conn, uid string, name string) {
+	login_data := make(map[string]interface{})
+	cmd_type := uint32(CMD_LOGIN)
+	login_data["UID"] = uid
+	login_data["UNAME"] = name
+	jData, err := json.Marshal(login_data)
+	if err != nil {
+		panic(err)
+	}
+	send_buff := bytes.NewBuffer(make([]byte, 0, 1024))
+	binary.Write(send_buff, binary.LittleEndian, uint32(len(jData)))
+	binary.Write(send_buff, binary.LittleEndian, cmd_type)
+	send_buff.Write(jData)
+	fmt.Println(len(jData), len(send_buff.Bytes()))
+	conn.Write(send_buff.Bytes())
+
+}
+
+func Talk(conn net.Conn, from string, from_name string, to string, data string) {
+	login_data := make(map[string]interface{})
+	cmd_type := uint32(CMD_MSG_P2P)
+	login_data["FROM"] = from
+	login_data["FROMNAME"] = from_name
+	login_data["TO"] = to
+	login_data["DATA"] = data
+	jData, err := json.Marshal(login_data)
+	if err != nil {
+		panic(err)
+	}
+	send_buff := bytes.NewBuffer(make([]byte, 0, 1024))
+	binary.Write(send_buff, binary.LittleEndian, uint32(len(jData)))
+	binary.Write(send_buff, binary.LittleEndian, cmd_type)
+	send_buff.Write(jData)
+	conn.Write(send_buff.Bytes())
 }
