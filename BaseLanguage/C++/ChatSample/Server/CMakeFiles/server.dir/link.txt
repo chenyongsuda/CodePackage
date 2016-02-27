@@ -1,0 +1,1 @@
+/usr/bin/c++       CMakeFiles/server.dir/BaseSocket.cpp.o CMakeFiles/server.dir/EventDispatch.cpp.o CMakeFiles/server.dir/netlib.cpp.o CMakeFiles/server.dir/BaseConn.cpp.o CMakeFiles/server.dir/test.cpp.o  -o server -rdynamic 

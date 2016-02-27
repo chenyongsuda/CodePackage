@@ -1,0 +1,32 @@
+#include "netlib.h"
+#include "ostype.h"
+#include "EventDispatch.h"
+
+int netlib_listen(
+		const char*	server_ip, 
+		int	port)
+{
+	int socketfd = socket(AF_INET, SOCK_STREAM, 0);
+	
+	//Set non block
+	setnonblocking(socketfd);
+	
+	//Set reuse
+	int reuse = 1;
+	int ret = setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, (char*)&reuse, sizeof(reuse));
+	
+	//New socket
+	sockaddr_in serv_addr;
+	memset(serv_addr, 0, sizeof(sockaddr_in));
+	pAddr->sin_family = AF_INET;
+	pAddr->sin_port = htons(port);
+	pAddr->sin_addr.s_addr = inet_addr(server_ip);
+	
+	//bind
+	int ret = bind(socketfd, (sockaddr*)&serv_addr, sizeof(serv_addr));
+	
+	//Add Event
+	EventDispatch::GetInstance()->AddEvent(EPOLLIN);
+
+	return socketfd;
+}
