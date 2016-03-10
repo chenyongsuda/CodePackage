@@ -1,0 +1,13 @@
+// (A)
+time.AfterFunc(5 * time.Minute, func() {
+    fmt.Printf("expired")
+}
+ 
+// (B) create a Timer object
+timer := time.NewTimer(5 * time.Minute)
+<-timer.C
+fmt.Printf("expired")
+ 
+// (C) time.After() returns timer.C internally
+<-time.After(5 * time.Minute)
+fmt.Printf("expired")
